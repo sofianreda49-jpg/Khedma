@@ -40,6 +40,7 @@ p.sub{color:var(--mute);margin:0 0 16px}
 .note{color:var(--star);font-size:13px;margin:0 0 10px}
 a.wa{display:block;text-align:center;background:#16a34a;color:#fff;text-decoration:none;padding:12px;border-radius:10px;font-weight:700}
 a.wa.off{opacity:.4;pointer-events:none}
+.nl{display:block;font-size:14px;color:var(--mute);margin:12px 0 6px}textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;resize:vertical}
 .rush{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:15px;cursor:pointer}
 .empty{color:var(--mute);font-size:14px;padding:8px 0}
 </style>
@@ -54,16 +55,17 @@ a.wa.off{opacity:.4;pointer-events:none}
   <div class="card" style="padding-bottom:16px">
     <div class="nm" style="padding-top:10px">طلبك</div>
     <div id="cart"></div>
+    <label class="nl" for="notes">تفاصيل الطلب (اختياري)</label><textarea id="notes" rows="3" placeholder="اكتب هنا اللي عايزه: اللغة، المدة، موعد التسليم، أي تفاصيل تانية..." oninput="draw()"></textarea>
     <label class="rush"><input type="checkbox" id="rush" onchange="draw()"> تسليم سريع (+<span id="rf"></span> ج.م)</label>
     <div class="tot"><span>الإجمالي</span><span id="total">0 ج.م</span></div>
-    <p class="note" id="note" hidden>* بنود "يبدأ من" سعرها النهائي بيتأكد حسب التفاصيل.</p>
+    <p class="note" id="note" hidden>* بنود "يبدأ من" و"حسب الطلب" سعرها النهائي بيتأكد حسب التفاصيل.</p>
     <a class="wa off" id="wa" href="#" target="_blank" rel="noopener">ابعت الطلب على واتساب</a>
   </div>
 </div>
 <script>
 var WHATSAPP = "201143371195"; // 01143371195 بصيغة دولية
 var RUSH = 30; // رسوم التسليم السريع (مرة واحدة للطلب كله)
-var CATS = [["pk","⭐ الباقات"],["ds","تصميم"],["ed","مونتاج"],["wr","كتابة وترجمة"],["sm","سوشيال وإعلانات"],["web","مواقع"],["dt","بيانات"]];
+var CATS = [["pk","⭐ الباقات"],["ds","تصميم"],["ed","مونتاج"],["wr","كتابة وترجمة"],["tx","تفريغ"],["sm","سوشيال وإعلانات"],["web","مواقع"],["dt","بيانات"]];
 // [id, category, name, price, unit, startsFrom, includes]
 var I = [
  ["starter","pk","Starter",499,"",0,"10 Posts · 5 Stories · 5 Captions · تعديلين لكل تصميم"],
@@ -83,6 +85,14 @@ var I = [
  ["cap","wr","كتابة Caption",40,"",1],
  ["scr","wr","كتابة Script قصير",100,"",1],
  ["tr","wr","ترجمة عربي/إنجليزي",50,"صفحة",0],
+ ["tx_a10","tx","تفريغ عربي — 10 دقائق",50,"",0],
+ ["tx_a30","tx","تفريغ عربي — 30 دقيقة",120,"",0],
+ ["tx_a60","tx","تفريغ عربي — 60 دقيقة",200,"",0],
+ ["tx_e10","tx","تفريغ إنجليزي — 10 دقائق",70,"",0],
+ ["tx_e30","tx","تفريغ إنجليزي — 30 دقيقة",170,"",0],
+ ["tx_e60","tx","تفريغ إنجليزي — 60 دقيقة",300,"",0],
+ ["tx_doc","tx","تفريغ + تنسيق Word",50,"",3,"إضافة على سعر التفريغ"],
+ ["tx_tr","tx","تفريغ + ترجمة",0,"",2,"هنأكد السعر معاك بعد ما تبعت الطلب"],
  ["mgt","sm","إدارة صفحة شهرية",1000,"شهر",1],
  ["mgfb","sm","إدارة Facebook + Instagram",1500,"شهر",1],
  ["lead","sm","Lead Generation",500,"",1],
@@ -103,7 +113,7 @@ function tabs(){
 function list(){
   $("list").innerHTML = I.filter(function(x){return x[1]===cur}).map(function(x){
     var q = Q[x[0]] || 0;
-    var price = (x[5] ? "يبدأ من " : "") + x[3] + " ج.م" + (x[4] ? " / " + x[4] : "");
+    var price = x[5]===2 ? "السعر حسب اللغة والمدة" : (x[5]===1 ? "يبدأ من " : x[5]===3 ? "+" : "") + x[3] + " ج.م" + (x[4] ? " / " + x[4] : "");
     var st = '<div class="st">' + (q ? '<button onclick="chg(\''+x[0]+'\',-1)">−</button><span>'+q+'</span>' : '') +
              '<button class="p" onclick="chg(\''+x[0]+'\',1)">+</button></div>';
     var info = '<div><div class="nm">'+x[2]+'</div><div class="pr">'+price+'</div>' + (x[6] ? '<div class="inc">'+x[6]+'</div>' : '') + '</div>';
@@ -115,16 +125,16 @@ function chg(id, d){ Q[id] = Math.max(0, (Q[id]||0) + d); list(); draw(); }
 function draw(){
   var ids = Object.keys(Q).filter(function(k){return Q[k]>0}), sum = 0, from = false;
   var lines = ids.map(function(k){
-    var x = find(k), t = x[3]*Q[k]; sum += t; if(x[5]) from = true;
-    return {txt: x[2]+" × "+Q[k]+(x[5]?" *":""), t: t};
+    var x = find(k), t = x[3]*Q[k]; sum += t; var star = x[5]===1 || x[5]===2; if(star) from = true;
+    return {txt: x[2]+" × "+Q[k]+(star?" *":""), t: t, q: x[5]===2};
   });
   var rush = lines.length && $("rush").checked;
   if(rush){ lines.push({txt:"تسليم سريع", t:RUSH}); sum += RUSH; }
   $("rf").textContent = RUSH;
-  $("cart").innerHTML = lines.length ? lines.map(function(l){return '<div class="item"><span>'+l.txt+'</span><span>'+l.t+' ج.م</span></div>'}).join("") : '<div class="empty">لسه مضفتش حاجة.</div>';
+  $("cart").innerHTML = lines.length ? lines.map(function(l){return '<div class="item"><span>'+l.txt+'</span><span>'+(l.q?'حسب الطلب':l.t+' ج.م')+'</span></div>'}).join("") : '<div class="empty">لسه مضفتش حاجة.</div>';
   $("total").textContent = sum + " ج.م";
   $("note").hidden = !from;
-  var msg = "أهلاً Khedma، عايز أطلب:\n" + lines.map(function(l){return "- "+l.txt+" = "+l.t+" ج.م"}).join("\n") + "\nالإجمالي: " + sum + " ج.م" + (from ? "\n(* السعر النهائي حسب التفاصيل)" : "");
+  var msg = "أهلاً Khedma، عايز أطلب:\n" + lines.map(function(l){return "- "+l.txt+" = "+(l.q?"حسب الطلب":l.t+" ج.م")}).join("\n") + "\nالإجمالي: " + sum + " ج.م" + (from ? "\n(* السعر النهائي حسب التفاصيل)" : "") + ($("notes").value.trim() ? "\nتفاصيل الطلب: " + $("notes").value.trim() : "");
   $("wa").href = "https://wa.me/" + WHATSAPP + "?text=" + encodeURIComponent(msg);
   $("wa").className = "wa" + (lines.length ? "" : " off");
 }
